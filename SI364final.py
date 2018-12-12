@@ -17,10 +17,10 @@ from flask_login import LoginManager, login_required, logout_user, login_user, U
 ############################
 # Application configurations
 ############################
+basedir = os.path.abspath(os.path.dirname(__file__))
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'hard to guess string from si364'
 app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://localhost/finalbecclest"
-# Provided:
 app.config['SQLALCHEMY_COMMIT_ON_TEARDOWN'] = True
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -40,18 +40,12 @@ db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 manager.add_command('db', MigrateCommand)
 
-# Set up Shell context so it's easy to use the shell to debug
-# Define function
-
 
 def make_shell_context():
     return dict(app=app, db=db)
 
 
-# Add function use to manager
 manager.add_command("shell", Shell(make_context=make_shell_context))
-
-
 #########################
 ##### Set up Models #####
 #########################
@@ -59,6 +53,9 @@ manager.add_command("shell", Shell(make_context=make_shell_context))
 # Association table
 cuisine_restaurant = db.Table('cuisine_restaurant', db.Column('restuarant_id', db.Integer, db.ForeignKey(
     'restaurants.id')), db.Column('cuisine_id', db.Integer, db.ForeignKey('cuisines.id')))
+
+user_collection = db.Table('user_collection', db.Column('user_id', db.Integer, db.ForeignKey(
+    'restaurants.id')), db.Column('collection_id', db.Integer, db.ForeignKey('personalrestaurantsearchcollections.id')))
 
 
 class User(UserMixin, db.Model):
@@ -89,6 +86,11 @@ class User(UserMixin, db.Model):
         return True
 
 
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+
 class Restaurant(db.Model):
     __tablename__ = "restaurants"
     id = db.Column(db.Integer, primary_key=True)
@@ -96,6 +98,9 @@ class Restaurant(db.Model):
     city_id = db.Column(db.Integer, db.ForeignKey("cities.id"))
     cuisines = db.relationship('Cuisine', secondary=cuisine_restaurant, backref=db.backref(
         'restaurants', lazy='dynamic'), lazy='dynamic')
+
+    def __repr__(self):
+        return "{} (ID: {})".format(self.name, self.id)
 
 
 class City(db.Model):
@@ -108,6 +113,23 @@ class Cuisine(db.Model):
     __tablename__ = "cuisines"
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(64))
+
+
+class Review(db.Model):
+    __tablename__ = 'reviews'
+    id = db.Column(db.Integer, primary_key=True)
+    rating = db.Column(db.Integer)
+    restaurant_id = db.Column(db.Integer, db.ForeignKey("restaurants.id"))
+
+
+# Model to store a personal collection of favorite restaurants
+class FaveRestaurantCollection(db.Model):
+    __tablename__ = "faveRestaurantCollection"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255))
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    restaurants = db.relationship('Gif', secondary=user_collection, backref=db.backref(
+        'personalGifCollections', lazy='dynamic'), lazy='dynamic')
 
 
 ########################
@@ -141,12 +163,35 @@ class LoginForm(FlaskForm):
     submit = SubmitField('Log In')
 
 
+class CollectionCreateForm(FlaskForm):
+    name = StringField('Collection Name', validators=[Required()])
+    restaurant_picks = SelectMultipleField('Restaurants to include:')
+    submit = SubmitField("Create Collection")
+
+###################################
+##### Helper Functions ###########
+###################################
+
+
+def get_or_create_collection(name, current_user, rest_list=[]):
+    restCollection = FaveRestaurantCollection.query.filter_by(
+        name=name, user_id=current_user.id).first()
+    if not restCollection:
+        restCollection = FaveRestaurantCollection(
+            name=name, user_id=current_user.id)
+        for g in rest_list:
+            restCollection.gifs.append(g)
+        db.session.add(restCollection)
+        db.session.commit()
+    return restCollection
+
+
 ###################################
 ##### Routes & view functions #####
 ###################################
 
 
-# Error handling routes
+# Error handling routes -- Provided
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html'), 404
@@ -156,7 +201,7 @@ def page_not_found(e):
 def internal_server_error(e):
     return render_template('500.html'), 500
 
-# Login routes
+# Login routes -- Provided
 
 
 @app.route('/login', methods=["GET", "POST"])
@@ -192,7 +237,18 @@ def register():
     return render_template('register.html', form=form)
 
 
+@app.route('/all_restaurants')
+def all_restaurants():
+    pass
+
+@app.route('/collections',methods=["GET","POST"])
+@login_required
+def collections():
+    colls = FaveRestaurantCollection.query.filter_by(user_id=current_user.id)
+    return render_template('collections.html',collections=colls)
+
+
 if __name__ == "__main__":
     db.create_all()
     manager.run()
-    app.run(debug=True)
+    app.run(use_reloader=True, debug=True)

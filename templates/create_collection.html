@@ -1,0 +1,13 @@
+<h1>Create a new GIF collection</h1>
+{% extends 'base.html' %}
+{% block navigation %}
+{{ super() }}
+{% endblock %}
+{% block main_content %}
+<form action="" method="POST">
+	{{ form.hidden_tag() }}
+	{{ form.name.label }} {{ form.name() }}
+	{{ form.restaurant_picks.label }} {{ form.restaurant_picks() }}
+	{{ form.submit.label }}{{ form.submit() }}
+</form>
+{% endblock %}

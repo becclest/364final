@@ -3,3 +3,14 @@
 {% else %}
     <a href="{{ url_for('login') }}">Sign In</a>
 {% endif %}
+
+{% block navigation %}
+<ul><i>
+    <li><a href="{{ url_for('index') }}">Search for gifs</a>
+    <li><a href="{{ url_for('all_gifs') }}">See all GIFs</a></li>
+    <li><a href="{{ url_for('search_terms') }}">See all past searches</a></li>
+    <li><a href="{{ url_for('create_collection') }}">Create a personal gif collection</a></li>
+    <li><a href="{{ url_for('collections') }}">See your collections</a></li></li></i>
+</ul>
+<p>--------</p><br>
+{% endblock %}
