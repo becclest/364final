@@ -20,6 +20,7 @@ from yelp_api_key import api_key
 # Application configurations
 ############################
 app = Flask(__name__)
+app.config['HEROKU_ON'] = os.environ.get('HEROKU')
 app.config['SECRET_KEY'] = 'hard to guess string from si364'
 app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://localhost/finalbecclest"
 app.config['SQLALCHEMY_COMMIT_ON_TEARDOWN'] = True
