@@ -1,13 +1,14 @@
-<h1>Create a new GIF collection</h1>
-{% extends 'base.html' %}
-{% block navigation %}
-{{ super() }}
-{% endblock %}
+{% import 'bootstrap/wtf.html' as wtf %}
+
+<h1>Create a new Restaurant collection</h1>
+
 {% block main_content %}
 <form action="" method="POST">
 	{{ form.hidden_tag() }}
 	{{ form.name.label }} {{ form.name() }}
+	<br><br>
 	{{ form.restaurant_picks.label }} {{ form.restaurant_picks() }}
+	<br><br>
 	{{ form.submit.label }}{{ form.submit() }}
 </form>
 {% endblock %}

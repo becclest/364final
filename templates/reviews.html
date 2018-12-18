@@ -1,0 +1,11 @@
+{% import 'bootstrap/wtf.html' as wtf %}
+
+<h1>Review Restaurants in your Collection</h1>
+
+<form method="post">
+    {{ form.csrf_token }}
+    {{ form.hidden_tag() }}
+    {{ form.user_review.label }} {{ form.user_review() }}<br>
+    {{ form.userRanking.label }} {{ form.userRanking() }}<br>
+    {{ form.submit() }}
+</form>

@@ -1,0 +1,18 @@
+
+<ul>
+{% for sg in all_rests %}
+<li>{{ sg }} </li>
+{% endfor %}
+</ul>
+
+{% if not all_songs %}
+There are no saved restaurants to show.
+{% endif %}
+
+<div>
+{% for message in get_flashed_messages() %}
+<strong>*** {{ message }} ***</strong>
+{% endfor %}
+</div>
+
+<a href="{{ url_for('index')}}">Return to add a new restaurant</a>

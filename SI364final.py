@@ -2,9 +2,10 @@ import os
 import requests
 import json
 from flask import Flask, render_template, session, redirect, request, url_for, flash
+from flask_bootstrap import Bootstrap
 from flask_script import Manager, Shell
 from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField, FileField, PasswordField, BooleanField, SelectMultipleField, ValidationError
+from wtforms import StringField, IntegerField, SubmitField, TextAreaField, PasswordField, BooleanField, SelectMultipleField, ValidationError
 from wtforms.validators import Required, Length, Email, Regexp, EqualTo
 from flask_sqlalchemy import SQLAlchemy
 import random
@@ -23,6 +24,8 @@ app.config['SECRET_KEY'] = 'hard to guess string from si364'
 app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://localhost/finalbecclest"
 app.config['SQLALCHEMY_COMMIT_ON_TEARDOWN'] = True
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.debug = True
+bootstrap = Bootstrap(app)
 
 ############################
 # Login configurations setup
@@ -49,19 +52,15 @@ manager.add_command("shell", Shell(make_context=make_shell_context))
 #########################
 ##### Set up Models #####
 #########################
-# Association Table between search terms (by cuisine and city) and restaurants
+# Association Table between search terms (by cuisine and city) and restaurants -- Used from HW 4
+tags = db.Table('tags', db.Column('search_id', db.Integer, db.ForeignKey(
+    'searchterms.id')), db.Column('restaurant_id', db.Integer, db.ForeignKey('restaurants.id')))
 
-
-
-# Association Table between restaurants and collections prepared by user
+# Association Table between restaurants and collections prepared by user -- Used from HW 4
 user_collection = db.Table('user_collection', db.Column('user_id', db.Integer, db.ForeignKey(
-    'restaurants.id')), db.Column('collection_id', db.Integer, db.ForeignKey('personalrestaurantsearchcollections.id')))
+    'restaurants.id')), db.Column('collection_id', db.Integer, db.ForeignKey('faveRestaurantCollection.id')))
 
-
-# Association table between review items and collections
-review_list = db.Table('review_list', db.Column('item_id', db.Integer, db.ForeignKey(
-    'items.id')), db.Column('list_id', db.Integer, db.ForeignKey('lists.id')))
-
+# User-related Models
 
 
 class User(UserMixin, db.Model):
@@ -69,7 +68,7 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(255), unique=True, index=True)
     email = db.Column(db.String(64), unique=True, index=True)
-    collection = db.relationship('PersonalCollection', backref='User')
+    collection = db.relationship('FaveRestaurantCollection', backref='User')
     password_hash = db.Column(db.String(128))
 
     @property
@@ -102,48 +101,54 @@ class Restaurant(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(64))
     yelpid = db.Column(db.String(128), unique=True)
-    description = db.Column(db.String(225))
+    URL = db.Column(db.String(256))
+    rating = db.Column(db.Integer)
+    reviews = db.relationship('ReviewItem', backref='Restaurant')
+
     def __repr__(self):
         return "{} (ID: {})".format(self.name, self.id)
 
 
- class SearchCriteria(db.Model):
+class SearchCriteria(db.Model):
     __tablename__ = "searchterms"
     id = db.Column(db.Integer, primary_key=True)
-    cusine = db.Column(db.String(32)) 
-    city = db.Column(db.String(32)) 
+    cuisine = db.Column(db.String(32))
+    city = db.Column(db.String(32))
     restaurants = db.relationship('Restaurant', secondary=tags, backref=db.backref(
         'search', lazy='dynamic'), lazy='dynamic')
 
     def __repr__(self):
-        return "{} in {}".format(self.cusine, self.city)
+        return "{} in {}".format(self.cuisine, self.city)
 
 # Model to store a personal collection of favorite restaurants
+
+
 class FaveRestaurantCollection(db.Model):
     __tablename__ = "faveRestaurantCollection"
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255))
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
-    restaurants = db.relationship('Gif', secondary=user_collection, backref=db.backref(
+    restaurants = db.relationship('Restaurant', secondary=user_collection, backref=db.backref(
         'faveRestaurantCollection', lazy='dynamic'), lazy='dynamic')
-    reviews = db.relationship('ReviewItem', secondary=on_list, backref=db.backref(
-        'lists', lazy='dynamic'), lazy='dynamic')
+
+# Model to store a personal collection of favorite restaurants
 
 
 class ReviewItem(db.Model):
     __tablename__ = 'reviews'
     id = db.Column(db.Integer, primary_key=True)
     restaurant_id = db.Column(db.Integer, db.ForeignKey("restaurants.id"))
-    rating = db.Column(db.Integer)
     review_text = db.Column(db.String(256))
-    priority = db.Column(db.Integer)
+    review_rating = db.Column(db.Integer)
 
     def __repr__(self):
-        return "Rating {} | {}".format(self.rating, self.review)
+        return "Rating {} | {}".format(self.review_rating, self.review_text)
 
-########################
-##### Set up Forms #####
-########################
+#########################
+######## Forms ##########
+#########################
+
+
 class RegistrationForm(FlaskForm):
     email = StringField('Email:', validators=[
                         Required(), Length(1, 64), Email()])
@@ -172,25 +177,36 @@ class LoginForm(FlaskForm):
     submit = SubmitField('Log In')
 
 
-class RestaurantForm(FlaskForm):
+class RestaurantSearchForm(FlaskForm):
     cuisine = StringField('What kind of food are you in the mood for?',
-                          validators=[Required()]))
-    city=StringField('What city do you want to search in?',validators = [Required()]))
-    submit=SubmitField('Search')
+                          validators=[Required()])
+    city = StringField('What city do you want to search in?',
+                       validators=[Required()])
+    submit = SubmitField('Search')
 
 
 class CollectionCreateForm(FlaskForm):
-    name=StringField('Collection Name', validators=[Required()])
-    restaurant_picks=SelectMultipleField('Restaurants to include:')
-    submit=SubmitField("Create Collection")
+    name = StringField('Collection Name', validators=[Required()])
+    restaurant_picks = SelectMultipleField('Restaurants to include:')
+    submit = SubmitField("Create Collection")
+
+
+class CreateReviewForm(FlaskForm):
+    user_review = TextAreaField(
+        "Write a review!", validators=[Required()])
+    userRanking = IntegerField(
+        "What is the new ranking of this restaurant?", validators=[Required()])
+    submit = SubmitField('Update')
+
 
 class UpdateReviewForm(FlaskForm):
     newRanking = StringField(
         "What is the new ranking of this restaurant?", validators=[Required()])
     submit = SubmitField('Update')
 
+
 class UpdateButtonForm(FlaskForm):
-	submit = SubmitField('Update')
+    submit = SubmitField('Update')
 
 
 class DeleteButtonForm(FlaskForm):
@@ -201,7 +217,7 @@ class DeleteButtonForm(FlaskForm):
 ##### Helper Functions ###########
 ###################################
 def get_restaurant_from_yelp(cuisine, city):
-    """ Returns data from Yelp API with up to 10 gifs corresponding to the search input"""
+    """ Returns data from Yelp API with up to 10 restaurants corresponding to the search input"""
     baseurl = "https://api.yelp.com/v3/businesses/search"
     params = {}
     params["term"] = cuisine
@@ -211,11 +227,20 @@ def get_restaurant_from_yelp(cuisine, city):
     headers = {
         'Authorization': 'Bearer %s' % api_key,
     }
+    try:
+        response = requests.get(baseurl, params=params, headers=headers)
+        text = json.loads(response.text)
+        todos = (text['businesses'])
+        return todos
 
-    response = requests.get(baseurl, params=params, headers=headers)
-    text = json.loads(response.text)
-    todos = (text['businesses'])
-    return todos
+    except:
+        return 'Trouble finding restaurant data'
+
+
+def get_restaurant_by_id(id):
+    rest = Restaurant.query.filter_by(id=id).first()
+    return rest
+
 
 def get_restaurant_review(id):
     baseurl = "https://api.yelp.com/v3/businesses/"
@@ -231,30 +256,51 @@ def get_restaurant_review(id):
         todos = (text['reviews'])
     return todos
 
-def get_restaurant_by_id(id):
-    rest=Restaurant.query.filter_by(id=id).first()
+
+def get_or_create_restaurant(restaurant_name, yelpid, url, rating):
+    rest = Restaurant.query.filter_by(name=restaurant_name).first()
+    if not rest:
+        print("Saving new restaurant")
+        rest = Restaurant(name=restaurant_name,
+                          yelpid=yelpid, URL=url, rating=rating)
+        db.session.add(rest)
+        db.session.commit()
     return rest
 
-def get_or_create_restaurant(db_session, restaurant_name, city_name, cuisines_list=[]):
-    city=get_or_create_city(db_session, city=city_name)
-    restaurant=db_session.query(Restaurant).filter_by(
-        name=restaurant_name, city_id=city.id).first()
-    if restaurant:
-        return restaurant
-    else:
-        restaurant=Restaurant(name=restaurant_name, city_id=city.id)
-        for cuisine in cuisines_list:
-            cuisine=get_or_create_cuisine(db_session, cuisine=cuisine)
-            restaurant.cuisines.append(cuisine)
-        db_session.add(restaurant)
-        db_session.commit()
-        return restaurant
+
+def get_or_create_search(cuisine, location):
+    searchTerm = SearchCriteria.query.filter_by(
+        cuisine=cuisine, city=location).first()
+    print("Got existing search term, not adding more restaurants")
+    if not searchTerm:
+        searchTerm = SearchCriteria(cuisine=cuisine, city=location)
+        rest_list = get_restaurant_from_yelp(cuisine, location)
+        for x in rest_list:
+            restaurant = get_or_create_restaurant(
+                x['name'], x['id'], x['url'], x['rating'])
+            searchTerm.restaurants.append(restaurant)
+        db.session.add(searchTerm)
+        db.session.commit()
+        print("Added new search term to db")
+    return searchTerm
+
+
+def get_or_create_review(current_user, restaurant_id):
+    reviewCollection = ReviewItem.query.filter_by(
+        restaurant_id=restaurant_id, user_id=current_user.id).first()
+    if not reviewCollection:
+        reviewCollection = ReviewItem(
+            restaurant_id=restaurant_id, user_id=current_user.id)
+        db.session.add(reviewCollection)
+        db.session.commit()
+    return reviewCollection
+
 
 def get_or_create_collection(name, current_user, rest_list=[]):
-    restCollection=FaveRestaurantCollection.query.filter_by(
+    restCollection = FaveRestaurantCollection.query.filter_by(
         name=name, user_id=current_user.id).first()
     if not restCollection:
-        restCollection=FaveRestaurantCollection(
+        restCollection = FaveRestaurantCollection(
             name=name, user_id=current_user.id)
         for g in rest_list:
             restCollection.restaurants.append(g)
@@ -265,9 +311,9 @@ def get_or_create_collection(name, current_user, rest_list=[]):
 ###################################
 ##### Routes & view functions #####
 ###################################
-
-
 # Error handling routes -- Provided
+
+
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html'), 404
@@ -282,9 +328,9 @@ def internal_server_error(e):
 
 @app.route('/login', methods=["GET", "POST"])
 def login():
-    form=LoginForm()
+    form = LoginForm()
     if form.validate_on_submit():
-        user=User.query.filter_by(email=form.email.data).first()
+        user = User.query.filter_by(email=form.email.data).first()
         if user is not None and user.verify_password(form.password.data):
             login_user(user, form.remember_me.data)
             return redirect(request.args.get('next') or url_for('index'))
@@ -302,9 +348,9 @@ def logout():
 
 @app.route('/register', methods=["GET", "POST"])
 def register():
-    form=RegistrationForm()
+    form = RegistrationForm()
     if form.validate_on_submit():
-        user=User(email=form.email.data,
+        user = User(email=form.email.data,
                     username=form.username.data, password=form.password.data)
         db.session.add(user)
         db.session.commit()
@@ -313,77 +359,76 @@ def register():
     return render_template('register.html', form=form)
 
 
+@app.route('/secret')
+@login_required
+def secret():
+    return "Only authenticated users can do this! Try to log in or contact the site admin."
+
+
 # Main routes
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    form = RestaurantForm()
+    form = RestaurantSearchForm()
     if form.validate_on_submit():
         cuisine = form.cuisine.data
         city = form.city.data
-        session['cuisine'] = cuisine
-        session['city'] = city
-        restaurant_data = get_restaurants(cuisine=cuisine, city=city)
-        return render_template('addrestaurants.html', data=restaurant_data)
-    return render_template('welcomepage.html', form=form)
+        get_or_create_search(cuisine, city)
+        return redirect(url_for('search_results', cuisine=cuisine, city=city))
+    return render_template('base.html', form=form)
 
-@app.route('/all_restaurants')
-def all_restaurants():
-    restaurants = Restaurant.query.all()
-    return render_template('all_rests.html', all_rests=restaurants)
 
+@app.route('/search_results/<cuisine>/<city>')
+def search_results(cuisine, city):
+    term = SearchCriteria.query.filter_by(cuisine=cuisine, city=city).first()
+    restaurants = term.restaurants.all()
+    return render_template('search_results.html', restaurants=restaurants)
 
 @app.route('/create_rest_collection', methods=["GET", "POST"])
 @login_required
 def create_collection():
     form = CollectionCreateForm()
-    gifs = Restaurant.query.all()
-    choices = [(r.id, r.title) for r in restaurants]
+    restaurants = Restaurant.query.all()
+    choices = [(r.id, r.name) for r in restaurants]
     form.restaurant_picks.choices = choices
+    if request.method == 'POST':
+        selected_restaurants = form.restaurant_picks.data
+        rest_objects = [get_restaurant_by_id(int(id)) for id in selected_restaurants]
+        get_or_create_collection(current_user=current_user, name=form.name.data, rest_list=rest_objects)
+        return redirect(url_for('collections'))
+    return render_template('create_collection.html', form=form)
 
 @app.route('/collections', methods=["GET", "POST"])
 @login_required
 def collections():
-    colls=FaveRestaurantCollection.query.filter_by(user_id=current_user.id)
-    return render_template('collections.html', collections=colls)
+    # TODO 364: This view function should render the collections.html template so that only the current user's personal gif collection links will render in that template. Make sure to examine the template so that you send it the correct data!
+    collection = FaveRestaurantCollection.query.filter_by(
+        user_id=current_user.id).all()
+    return render_template('collections.html', collections=collection)
 
-
-# Provided from HW 4
 @app.route('/collection/<id_num>')
 def single_collection(id_num):
     id_num = int(id_num)
     collection = FaveRestaurantCollection.query.filter_by(id=id_num).first()
-    rests = collection.restaurants.all()
-    return render_template('collection.html', collection=collection, gifs=gifs)
-
-# Route to update an individual ToDo item's priority
-@app.route('/update/<item>', methods=["GET", "POST"])
-def update(item):
-    # Replace with code
-    # This code should use the form you created above for updating the specific item and manage the process of updating the item's priority.
-    # Once it is updated, it should redirect to the page showing all the links to todo lists.
-    # It should flash a message: Updated priority of <the description of that item>
-    # HINT: What previous class example is extremely similar?
-    form = UpdateInfoForm()
-    if form.validate_on_submit():
-        new_priority = form.newPriority.data
-        item_select = TodoItem.query.filter_by(id=item).first()
-        item_select.priority = new_priority
-        db.session.commit()
-        flash("Updated priority of item: {}".format(item_select.description))
-        return redirect(url_for('all_lists'))
-    return render_template('update_item.html', item_id=item, form=form)
-
+    restaurants = collection.restaurants.all()
+    return render_template('collection.html', collection=collection, restaurants=restaurants)
 
 # Route to delete a whole Collection
-@app.route('/delete/<lst>', methods=["GET", "POST"])
-def delete(lst):
+@app.route('/collection/delete/<id_num>', methods=["GET", "POST"])
+def delete(id_num):
     collection = FaveRestaurantCollection.query.filter_by(id=id_num).first()
     db.session.delete(collection)
     db.session.commit()
     flash("Successfully deleted {}".format(collection.title))
-    return redirect(url_for('all_lists'))
+    return redirect(url_for('collections'))
+
+
+@app.route('/all_restaurants')
+def all_restaurants():
+    restaurants = Restaurant.query.all()
+    return render_template('all_restaurants.html', all_rests=restaurants)
+
 
 if __name__ == "__main__":
     db.create_all()
     manager.run()
-    app.run(use_reloader=True, debug=True)
+    app.run(use_reloader=True)
