@@ -1,4 +1,13 @@
 {% import 'bootstrap/wtf.html' as wtf %}
+{% block nav %}
+<ul><i>
+    <li><a href="{{ url_for('index') }}">Search for restaurants</a>
+    <li><a href="{{ url_for('create_collection') }}">Create a personal restaurant collection</a></li>
+    <li><a href="{{ url_for('collections') }}">See your collections</a></li>
+    <li><a href="{{ url_for('all_restaurants') }}">See all of your restaurants</a></li>
+</ul>
+<p>--------</p><br>
+{% endblock %}
 
 <h1>Create a new Restaurant collection</h1>
 

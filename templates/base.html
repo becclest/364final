@@ -2,13 +2,17 @@
     <a href="{{ url_for('logout') }}">Sign Out {{current_user.username}}</a>
 {% else %}
     <a href="{{ url_for('login') }}">Sign In</a>
+    <a href="{{ url_for('register') }}">Register</a>
+
 {% endif %}
 
-{% block navigation %}
+
+{% block nav %}
 <ul><i>
-    <li><a href="{{ url_for('index') }}">Search for gifs</a>
+    <li><a href="{{ url_for('index') }}">Search for restaurants</a>
     <li><a href="{{ url_for('create_collection') }}">Create a personal restaurant collection</a></li>
-    <li><a href="{{ url_for('collections') }}">See your collections</a></li></li></i>
+    <li><a href="{{ url_for('collections') }}">See your collections</a></li>
+    <li><a href="{{ url_for('all_restaurants') }}">See all of your restaurants</a></li>
 </ul>
 <p>--------</p><br>
 {% endblock %}

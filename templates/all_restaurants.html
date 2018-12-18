@@ -3,8 +3,8 @@
 {% for sg in all_rests %}
 <li>{{ sg }} </li>
 <li><a href="/review/{{ sg.id}}">Make Review for this Restaurant.</a></li>
-<li>{{ reviews }} </li>
 
+<br><br>
 {% endfor %}
 </ul>
 
@@ -17,5 +17,12 @@ There are no saved restaurants to show.
 <strong>*** {{ message }} ***</strong>
 {% endfor %}
 </div>
+
+<h2>Reviews!</h2>
+{% for c in choices %}
+<li>{{ c }}</li>
+<br><br>
+{% endfor %}
+
 
 <a href="{{ url_for('index')}}">Return to add a new restaurant</a>

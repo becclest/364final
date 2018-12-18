@@ -1,9 +1,16 @@
-{% extends 'base.html' %}
 {% import 'bootstrap/wtf.html' as wtf %}
 
-<h1>Review Restaurants in your Collection</h1>
+{% block nav %}
+<ul><i>
+    <li><a href="{{ url_for('index') }}">Search for restaurants</a>
+    <li><a href="{{ url_for('create_collection') }}">Create a personal restaurant collection</a></li>
+    <li><a href="{{ url_for('collections') }}">See your collections</a></li>
+    <li><a href="{{ url_for('all_restaurants') }}">See all of your restaurants</a></li>
+</ul>
+<p>--------</p><br>
+{% endblock %}
 
-<h2>{{collection}}</h2>
+<h1>Review {{collection}}</h1>
 <form method="post">
     {{ form.csrf_token }}
     {{ form.hidden_tag() }}
@@ -11,9 +18,3 @@
     {{ form.userRanking.label }} {{ form.userRanking() }}<br>
     {{ form.submit() }}
 </form>
-
-<div>
-{% for message in get_flashed_messages() %}
-{{ message }}
-{% endfor %}
-</div>

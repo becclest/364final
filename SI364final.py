@@ -6,7 +6,7 @@ from flask_bootstrap import Bootstrap
 from flask_script import Manager, Shell
 from flask_wtf import FlaskForm
 from wtforms import StringField, IntegerField, SubmitField, TextAreaField, PasswordField, BooleanField, SelectMultipleField, ValidationError
-from wtforms.validators import Required, Length, Email, Regexp, EqualTo
+from wtforms.validators import Required, Length, Email, Regexp, EqualTo, NumberRange
 from flask_sqlalchemy import SQLAlchemy
 import random
 from flask_migrate import Migrate, MigrateCommand
@@ -141,12 +141,20 @@ class ReviewItem(db.Model):
     review_rating = db.Column(db.Integer)
 
     def __repr__(self):
-        return "Rating {} | {}".format(self.review_rating, self.review_text)
+        return "(ID: {}) |  Rating: {} out of 5 | {}".format(self.restaurant_id, self.review_rating, self.review_text)
 
 #########################
 ######## Forms ##########
 #########################
 
+
+def check_review(self, field):
+    if len(field.data.split()) < 10:
+        raise ValidationError('The Review MUST be at least 10 words!')
+
+def check_location(self, field):
+    if len(field.data.split()) < 2:
+        raise ValidationError('The Location MUST be at least 2 words!')
 
 class RegistrationForm(FlaskForm):
     email = StringField('Email:', validators=[
@@ -179,8 +187,8 @@ class LoginForm(FlaskForm):
 class RestaurantSearchForm(FlaskForm):
     cuisine = StringField('What kind of food are you in the mood for?',
                           validators=[Required()])
-    city = StringField('What city do you want to search in?',
-                       validators=[Required()])
+    city = StringField('What city and state do you want to search in?',
+                       validators=[Required(), check_location])
     submit = SubmitField('Search')
 
 
@@ -192,15 +200,15 @@ class CollectionCreateForm(FlaskForm):
 
 class CreateReviewForm(FlaskForm):
     user_review = TextAreaField(
-        "Write a review!", validators=[Required()])
+        "Write a review!", validators=[Required(), check_review])
     userRanking = IntegerField(
-        "What is the new ranking of this restaurant?", validators=[Required()])
+        "What is the new ranking of this restaurant?", validators=[Required(), NumberRange(max=10)])
     submit = SubmitField('Update')
 
 
 class UpdateReviewForm(FlaskForm):
     newRanking = StringField(
-        "What is the new ranking of this restaurant?", validators=[Required()])
+        "What is the new ranking of this restaurant?", validators=[Required(), check_review])
     submit = SubmitField('Update')
 
 
@@ -366,6 +374,11 @@ def secret():
 
 # Main routes
 @app.route('/', methods=['GET', 'POST'])
+def base():
+    return render_template('base.html')
+
+
+@app.route('/index', methods=['GET', 'POST'])
 def index():
     form = RestaurantSearchForm()
     if form.validate_on_submit():
@@ -410,6 +423,7 @@ def collections():
 
 
 @app.route('/collection/<id_num>')
+@login_required
 def single_collection(id_num):
     id_num = int(id_num)
     collection = FaveRestaurantCollection.query.filter_by(id=id_num).first()
@@ -420,20 +434,21 @@ def single_collection(id_num):
 
 
 @app.route('/collection/delete/<id_num>', methods=["GET", "POST"])
-def delete(id_num):
+@login_required
+def delete_collection(id_num):
     collection = FaveRestaurantCollection.query.filter_by(id=id_num).first()
     db.session.delete(collection)
     db.session.commit()
     flash("Successfully deleted {}".format(collection.name))
     return redirect(url_for('collections'))
 
+
 @app.route('/all_restaurants')
+@login_required
 def all_restaurants():
     restaurants = Restaurant.query.all()
-    for r in restaurants:
-        reviews = ReviewItem.query.filter_by(
-            restaurant_id=r.id).all()
-    return render_template('all_restaurants.html', all_rests=restaurants, reviews=reviews)
+    choices = ReviewItem.query.all()
+    return render_template('all_restaurants.html', all_rests=restaurants, choices=choices)
 
 
 @app.route('/review/<id_num>', methods=["GET", "POST"])
@@ -446,25 +461,36 @@ def create_review(id_num):
         review = form.user_review.data
         ranking = form.userRanking.data
         new_review = get_or_create_review(restaurant_id=id_num)
-        new_review = ReviewItem(review_text=review, review_rating=ranking)
+        new_review = ReviewItem(restaurant_id=id_num,
+                                review_text=review, review_rating=ranking)
         db.session.add(new_review)
         db.session.commit()
         flash("Successfully added review to {}".format(collection.name))
-        return redirect(url_for('reviews.html'))
+        return redirect(url_for('all_restaurants'))
     return render_template('reviews.html', form=form, collection=collection)
 
 
 @app.route('/review/update/<id_num>', methods=["GET", "POST"])
+@login_required
 def update(id_num):
     form = UpdateReviewForm()
     if form.validate_on_submit():
         newRanking = form.newRanking.data
-        item_select = ReviewItem.query.filter_by(id=id_num).first()
-        item_select.priority = newRanking
+        item_select = ReviewItem.query.filter_by(restaurant_id=id_num).first()
+        item_select.review_rating = newRanking
         db.session.commit()
-        flash("Updated ranking of ranking: {}".format(item_select.description))
-        return redirect(url_for('collections'))
-    return render_template('update_item.html', item_id=id_num, form=form)
+        flash("Updated ranking of ranking: {}".format(item_select.review_rating))
+        return redirect(url_for('all_restaurants'))
+    return render_template('update_ranking.html', item_id=id_num, form=form)
+
+
+@app.route('/delete/<id_num>', methods=["GET", "POST"])
+def delete_review(id_num):
+    item_select = ReviewItem.query.filter_by(restaurant_id=id_num).first()
+    db.session.delete(item_select)
+    db.session.commit()
+    return redirect(url_for('all_restaurants'))
+
 
 if __name__ == "__main__":
     db.create_all()
