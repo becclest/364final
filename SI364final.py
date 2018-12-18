@@ -103,7 +103,6 @@ class Restaurant(db.Model):
     yelpid = db.Column(db.String(128), unique=True)
     URL = db.Column(db.String(256))
     rating = db.Column(db.Integer)
-    reviews = db.relationship('ReviewItem', backref='Restaurant')
 
     def __repr__(self):
         return "{} (ID: {})".format(self.name, self.id)
@@ -285,12 +284,12 @@ def get_or_create_search(cuisine, location):
     return searchTerm
 
 
-def get_or_create_review(current_user, restaurant_id):
+def get_or_create_review(restaurant_id):
     reviewCollection = ReviewItem.query.filter_by(
-        restaurant_id=restaurant_id, user_id=current_user.id).first()
+        restaurant_id=restaurant_id)
     if not reviewCollection:
         reviewCollection = ReviewItem(
-            restaurant_id=restaurant_id, user_id=current_user.id)
+            restaurant_id=restaurant_id)
         db.session.add(reviewCollection)
         db.session.commit()
     return reviewCollection
@@ -374,7 +373,7 @@ def index():
         city = form.city.data
         get_or_create_search(cuisine, city)
         return redirect(url_for('search_results', cuisine=cuisine, city=city))
-    return render_template('base.html', form=form)
+    return render_template('index.html', form=form)
 
 
 @app.route('/search_results/<cuisine>/<city>')
@@ -382,6 +381,7 @@ def search_results(cuisine, city):
     term = SearchCriteria.query.filter_by(cuisine=cuisine, city=city).first()
     restaurants = term.restaurants.all()
     return render_template('search_results.html', restaurants=restaurants)
+
 
 @app.route('/create_rest_collection', methods=["GET", "POST"])
 @login_required
@@ -392,10 +392,13 @@ def create_collection():
     form.restaurant_picks.choices = choices
     if request.method == 'POST':
         selected_restaurants = form.restaurant_picks.data
-        rest_objects = [get_restaurant_by_id(int(id)) for id in selected_restaurants]
-        get_or_create_collection(current_user=current_user, name=form.name.data, rest_list=rest_objects)
+        rest_objects = [get_restaurant_by_id(
+            int(id)) for id in selected_restaurants]
+        get_or_create_collection(
+            current_user=current_user, name=form.name.data, rest_list=rest_objects)
         return redirect(url_for('collections'))
     return render_template('create_collection.html', form=form)
+
 
 @app.route('/collections', methods=["GET", "POST"])
 @login_required
@@ -405,6 +408,7 @@ def collections():
         user_id=current_user.id).all()
     return render_template('collections.html', collections=collection)
 
+
 @app.route('/collection/<id_num>')
 def single_collection(id_num):
     id_num = int(id_num)
@@ -413,20 +417,54 @@ def single_collection(id_num):
     return render_template('collection.html', collection=collection, restaurants=restaurants)
 
 # Route to delete a whole Collection
+
+
 @app.route('/collection/delete/<id_num>', methods=["GET", "POST"])
 def delete(id_num):
     collection = FaveRestaurantCollection.query.filter_by(id=id_num).first()
     db.session.delete(collection)
     db.session.commit()
-    flash("Successfully deleted {}".format(collection.title))
+    flash("Successfully deleted {}".format(collection.name))
     return redirect(url_for('collections'))
-
 
 @app.route('/all_restaurants')
 def all_restaurants():
     restaurants = Restaurant.query.all()
-    return render_template('all_restaurants.html', all_rests=restaurants)
+    for r in restaurants:
+        reviews = ReviewItem.query.filter_by(
+            restaurant_id=r.id).all()
+    return render_template('all_restaurants.html', all_rests=restaurants, reviews=reviews)
 
+
+@app.route('/review/<id_num>', methods=["GET", "POST"])
+@login_required
+def create_review(id_num):
+    form = CreateReviewForm()
+    id_num = int(id_num)
+    collection = Restaurant.query.filter_by(id=id_num).first()
+    if request.method == "POST":
+        review = form.user_review.data
+        ranking = form.userRanking.data
+        new_review = get_or_create_review(restaurant_id=id_num)
+        new_review = ReviewItem(review_text=review, review_rating=ranking)
+        db.session.add(new_review)
+        db.session.commit()
+        flash("Successfully added review to {}".format(collection.name))
+        return redirect(url_for('reviews.html'))
+    return render_template('reviews.html', form=form, collection=collection)
+
+
+@app.route('/review/update/<id_num>', methods=["GET", "POST"])
+def update(id_num):
+    form = UpdateReviewForm()
+    if form.validate_on_submit():
+        newRanking = form.newRanking.data
+        item_select = ReviewItem.query.filter_by(id=id_num).first()
+        item_select.priority = newRanking
+        db.session.commit()
+        flash("Updated ranking of ranking: {}".format(item_select.description))
+        return redirect(url_for('collections'))
+    return render_template('update_item.html', item_id=id_num, form=form)
 
 if __name__ == "__main__":
     db.create_all()

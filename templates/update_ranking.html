@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title></title>
+</head>
+<body>
+	<form method="POST" action="/update/{{ item_id }}">
+	{{ form.hidden_tag() }}
+	{{form.newRanking.label }} {{ form.newRanking() }}
+	{{ form.submit() }}
+	</form>
+
+	<div>
+	{% for message in get_flashed_messages() %}
+		{{ message }}
+	{% endfor %}
+	</div>
+
+</body>
+</html>

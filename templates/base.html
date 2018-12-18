@@ -1,33 +1,14 @@
-<!DOCTYPE html>
-<html lang="en" dir="ltr">
-    <head>
-        <link href="/static/css/bootstrap.min.css" rel="stylesheet" media="screen">
-        <link href="/static/css/bootstrap-responsive.min.css" rel="stylesheet">
-        <script src="http://code.jquery.com/jquery-latest.js"></script>
-        <script src="/static/js/bootstrap.min.js"></script>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    </head>
-	<body>
-        {}
-        {% if current_user.is_authenticated %}
-            <a href="{{ url_for('logout') }}">Sign Out {{current_user.username}}</a>
-        {% else %}
-            <a href="{{ url_for('login') }}">Sign In</a>
-        {% endif %}
-        <p>New User? <a href="{{ url_for('register') }}">Click to Register!</a></p>
+{% if current_user.is_authenticated %}
+    <a href="{{ url_for('logout') }}">Sign Out {{current_user.username}}</a>
+{% else %}
+    <a href="{{ url_for('login') }}">Sign In</a>
+{% endif %}
 
-        {% block app_content %}
-        <h1>Hi, {{ current_user.username }}!</h1>
-        <h2>What type of food are you looking for?</h2>
-        <br>
-        <form method="POST">
-        	{{ form.csrf_token }}
-        	{{ form.hidden_tag() }}
-        	{{ form.cuisine.label }} {{ form.cuisine() }}<br>
-        	{{ form.city.label }} {{ form.city() }}<br>
-        	{{ form.submit() }}
-        </form>
-        {% endblock %}
-
-	</body>
-</html>
+{% block navigation %}
+<ul><i>
+    <li><a href="{{ url_for('index') }}">Search for gifs</a>
+    <li><a href="{{ url_for('create_collection') }}">Create a personal restaurant collection</a></li>
+    <li><a href="{{ url_for('collections') }}">See your collections</a></li></li></i>
+</ul>
+<p>--------</p><br>
+{% endblock %}

@@ -1,7 +1,9 @@
+{% extends 'base.html' %}
 {% import 'bootstrap/wtf.html' as wtf %}
 
 <h1>Review Restaurants in your Collection</h1>
 
+<h2>{{collection}}</h2>
 <form method="post">
     {{ form.csrf_token }}
     {{ form.hidden_tag() }}
@@ -9,3 +11,9 @@
     {{ form.userRanking.label }} {{ form.userRanking() }}<br>
     {{ form.submit() }}
 </form>
+
+<div>
+{% for message in get_flashed_messages() %}
+{{ message }}
+{% endfor %}
+</div>

@@ -1,3 +1,13 @@
+{% extends 'base.html' %}
+{% import 'bootstrap/wtf.html' as wtf %}
+
+<form method="post">
+    {{ form.csrf_token }}
+    {{ form.hidden_tag() }}
+    {{ form.cuisine.label }} {{ form.cuisine() }}<br>
+    {{ form.city.label }} {{ form.city() }}<br>
+    {{ form.submit() }}
+</form>
 
 <ul>
 {% for sg in all_rests %}
